@@ -1,5 +1,7 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { RpcException } from '@nestjs/microservices';
+
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from 'src/common/dto';
@@ -22,7 +24,11 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   async findAll(paginationDto: PaginationDto) {
     const { limit, page } = paginationDto;
 
-    const total = await this.product.count();
+    const total = await this.product.count({
+      where: {
+        available: true,
+      },
+    });
     const lastPage = Math.ceil(total / limit);
 
     const products = await this.product.findMany({
@@ -43,7 +49,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     };
   }
 
-  async findOne(id: number) {
+  async findById(id: number) {
     const product = await this.product.findUnique({
       where: {
         id,
@@ -52,7 +58,10 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new RpcException({
+        message: `Product with id ${id} not found`,
+        status: HttpStatus.NOT_FOUND,
+      });
     }
 
     return product;
@@ -61,7 +70,14 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   async update(id: number, updateProductDto: UpdateProductDto) {
     const { id: _, ...data } = updateProductDto;
 
-    await this.findOne(id);
+    if (Object.keys(data).length === 0) {
+      throw new RpcException({
+        message: 'At least one field must be provided to update',
+        status: HttpStatus.BAD_REQUEST,
+      });
+    }
+
+    await this.findById(id);
 
     return this.product.update({
       where: {
@@ -72,7 +88,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    await this.findById(id);
 
     return await this.product.update({
       where: {

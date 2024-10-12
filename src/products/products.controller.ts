@@ -20,8 +20,8 @@ export class ProductsController {
   }
 
   @MessagePattern({ cmd: 'find-product-by-id' })
-  findOne(@Payload('id', ParseIntPipe) id: number) {
-    return this.productsService.findOne(id);
+  findById(@Payload('id', ParseIntPipe) id: number) {
+    return this.productsService.findById(id);
   }
 
   @MessagePattern({ cmd: 'update-product' })
